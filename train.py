@@ -8,15 +8,15 @@ import matplotlib.pyplot as plt
 
 epochs = 30
 d1_train = CustomDataset(
-    data_path="../mm_sada_task/RGB/RGB/ek_i3d/D1-D1_train.pkl",
-    labels_path="./Annotations/D1_train.pkl",
+    data_path="./pre_extracted_features/RGB/RGB/ek_i3d/D1-D1_train.pkl",
+    labels_path="./label_lookup/D1_train.pkl",
     modality="RGB"
 )
 d1_loader = DataLoader(d1_train, batch_size=64, shuffle=True)
 
 d2_train = CustomDataset(
-    data_path="../mm_sada_task/RGB/RGB/ek_i3d/D2-D2_train.pkl",
-    labels_path="./Annotations/D2_train.pkl",
+    data_path="./pre_extracted_features/RGB/RGB/ek_i3d/D2-D2_train.pkl",
+    labels_path="./label_lookup/D2_train.pkl",
     modality="RGB"
 )
 d2_loader = DataLoader(d2_train, batch_size=64, shuffle=True)
