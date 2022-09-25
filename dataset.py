@@ -1,3 +1,4 @@
+from torch.utils.data import Dataset
 import pickle
 import numpy as np
 import pandas as pd
