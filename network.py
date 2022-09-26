@@ -11,14 +11,5 @@ class Net(nn.Module):
     def forward(self, x):
         x = self.fc1(x)
         intermediate_feature = F.relu(x)
-        output = F.softmax(self.fc2(intermediate_feature), dim=0)
+        output = F.softmax(self.fc2(intermediate_feature), dim=1)
         return intermediate_feature, output
-
-class IntermediateNet(nn.Module):
-    def __init__(self):
-        super(IntermediateNet, self).__init__()
-        self.fc1 = nn.Linear(1024, 1024)
-
-    def forward(self, x):
-        x = self.fc1(x)
-        return F.relu(x)
