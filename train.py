@@ -14,13 +14,13 @@ epochs = 100
 
 d1_loader, d2_loader = load_training_datasets()
 model = Net()
-optim = torch.optim.Adam(model.parameters(), lr=0.00001)
+optim = torch.optim.Adam(model.parameters(), lr=0.0001)
 for epoch in range(epochs):
     print(f"Epoch: {epoch}")
     add_mmd_loss = False
     if epoch > 35:
         add_mmd_loss = True
-        optim.param_groups[0]['lr'] = 0.00002
+        optim.param_groups[0]['lr'] = 0.00005
     sum_loss = 0
     sum_mmd_loss = 0
     counter = 0
