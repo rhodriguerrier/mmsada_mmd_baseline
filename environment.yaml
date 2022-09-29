@@ -1,4 +1,4 @@
-name: mmd_baseline
+name: mmd_baseline_gpu
 channels:
   - pytorch
   - defaults
@@ -15,12 +15,12 @@ dependencies:
   - certifi=2022.9.14=py39h06a4308_0
   - cffi=1.15.1=py39h74dc2b5_0
   - charset-normalizer=2.0.4=pyhd3eb1b0_0
-  - cpuonly=2.0=0
   - cryptography=37.0.1=py39h9ce1e76_0
+  - cudatoolkit=10.2.89=hfd86e86_1
   - cycler=0.11.0=pyhd3eb1b0_0
   - dbus=1.13.18=hb2f20db_0
-  - expat=2.4.4=h295c915_0
-  - ffmpeg=4.2.2=h20bf706_0
+  - expat=2.4.9=h6a678d5_0
+  - ffmpeg=4.3=hf484d3e_0
   - fftw=3.3.9=h27cfd23_1
   - fontconfig=2.13.1=h6c09931_0
   - fonttools=4.25.0=pyhd3eb1b0_0
@@ -54,9 +54,9 @@ dependencies:
   - libgfortran-ng=11.2.0=h00389a5_1
   - libgfortran5=11.2.0=h1234567_1
   - libgomp=11.2.0=h1234567_1
+  - libiconv=1.16=h7f8727e_2
   - libidn2=2.3.2=h7f8727e_0
   - libllvm10=10.0.1=hbcb73fb_5
-  - libopus=1.3.1=h7b6447c_0
   - libpng=1.6.37=hbc83047_0
   - libpq=12.9=h16c4e8d_3
   - libstdcxx-ng=11.2.0=h1234567_1
@@ -64,7 +64,6 @@ dependencies:
   - libtiff=4.4.0=hecacb30_0
   - libunistring=0.9.10=h27cfd23_0
   - libuuid=1.0.3=h7f8727e_2
-  - libvpx=1.7.0=h439df22_0
   - libwebp=1.2.2=h55f646e_0
   - libwebp-base=1.2.2=h7f8727e_0
   - libxcb=1.15=h7f8727e_0
@@ -102,8 +101,8 @@ dependencies:
   - pysocks=1.7.1=py39h06a4308_0
   - python=3.9.13=haa1d7c7_1
   - python-dateutil=2.8.2=pyhd3eb1b0_0
-  - pytorch=1.12.1=py3.9_cpu_0
-  - pytorch-mutex=1.0=cpu
+  - pytorch=1.12.1=py3.9_cuda10.2_cudnn7.6.5_0
+  - pytorch-mutex=1.0=cuda
   - pytz=2022.1=py39h06a4308_0
   - qt-main=5.15.2=h327a75a_7
   - qt-webengine=5.15.9=hd2b0992_4
@@ -115,22 +114,18 @@ dependencies:
   - setuptools=63.4.1=py39h06a4308_0
   - sip=6.6.2=py39h6a678d5_0
   - six=1.16.0=pyhd3eb1b0_1
-  - sqlite=3.39.2=h5082296_0
+  - sqlite=3.39.3=h5082296_0
   - threadpoolctl=2.2.0=pyh0d69192_0
   - tk=8.6.12=h1ccaba5_0
   - toml=0.10.2=pyhd3eb1b0_0
-  - torchaudio=0.12.1=py39_cpu
-  - torchvision=0.13.1=py39_cpu
+  - torchaudio=0.12.1=py39_cu102
+  - torchvision=0.13.1=py39_cu102
   - tornado=6.2=py39h5eee18b_0
   - typing_extensions=4.3.0=py39h06a4308_0
   - tzdata=2022c=h04d1e81_0
   - urllib3=1.26.11=py39h06a4308_0
   - wheel=0.37.1=pyhd3eb1b0_0
-  - x264=1!157.20191217=h7b6447c_0
-  - xz=5.2.5=h7f8727e_1
+  - xz=5.2.6=h5eee18b_0
   - zlib=1.2.12=h5eee18b_3
   - zstd=1.5.2=ha4553b6_0
-  - pip:
-    - h5py==3.7.0
-    - hickle==5.0.2
-prefix: /home/rg16964/miniconda3/envs/mmd_baseline
+prefix: /home/rg16964/miniconda3/envs/mmd_baseline_gpu
