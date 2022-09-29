@@ -35,12 +35,12 @@ for epoch in range(epochs):
             rgb_mmd_loss = mix_rbf_mmd2(
                 new_d1_rgb_ft,
                 new_d2_rgb_ft,
-                gammas=[10.0,1.0,0.1,0.01,0.001]
+                gammas=[(2.0 ** gamma) * 9.7 for gamma in np.arange(-8.0, 8.0, 2.0 ** 0.5)]
             )
             flow_mmd_loss = mix_rbf_mmd2(
                 new_d1_flow_ft,
                 new_d2_flow_ft,
-                gammas=[10.0,1.0,0.1,0.01,0.001]
+                gammas=[(2.0 ** gamma) * 9.7 for gamma in np.arange(-8.0, 8.0, 2.0 ** 0.5)]
             )
             loss = d1_class_loss + (1 * (rgb_mmd_loss + flow_mmd_loss))
             sum_mmd_loss += (rgb_mmd_loss + flow_mmd_loss)
