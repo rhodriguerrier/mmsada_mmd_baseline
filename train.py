@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 import wandb
 
 
-wandb.init(project="mmsada_mmd_baseline", name="run-4", config={"initial_lr": 0.0001, "secondary_lr": 0.00008, "tertiary_lr": 0.00005, "epochs": 100, "batch_size": 128})
+wandb.init(project="mmsada_mmd_baseline", name="run-5", config={"initial_lr": 0.0001, "secondary_lr": 0.00008, "tertiary_lr": 0.00005, "epochs": 100, "batch_size": 128})
 
 epochs = 100
 

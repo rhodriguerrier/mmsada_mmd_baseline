@@ -28,10 +28,10 @@ class Net(nn.Module):
         # Send intermediate features to self-supervision
         concat_features = torch.cat((mid_rgb_features, mid_flow_features), -1)
         mid_self_sup = F.relu(self.fc2_a_1(concat_features))
-        ss_output = F.softmax(self.fc2_a_2(mid_self_sup), dim=1)
+        ss_logits = self.fc2_a_2(mid_self_sup)
 
         # Send intermediate features to classification head
         rgb_class_logits = self.fc2_b_rgb(mid_rgb_features)
         flow_class_logits = self.fc2_b_flow(mid_flow_features)
-        class_output = F.softmax((rgb_class_logits + flow_class_logits), dim=1)
-        return mid_rgb_features, mid_flow_features, class_output, ss_output
+        class_logits = (rgb_class_logits + flow_class_logits)
+        return mid_rgb_features, mid_flow_features, class_logits, ss_logits
