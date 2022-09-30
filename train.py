@@ -33,8 +33,8 @@ for epoch in range(epochs):
         if d1_rgb_ft.shape != d2_rgb_ft.shape or d1_flow_ft.shape != d2_flow_ft.shape:
             continue
         ce_loss = nn.CrossEntropyLoss()
-        new_d1_rgb_ft, new_d1_flow_ft, d1_output = model(torch.tensor(d1_rgb_ft).float(), torch.tensor(d1_flow_ft).float())
-        new_d2_rgb_ft, new_d2_flow_ft, d2_output = model(torch.tensor(d2_rgb_ft).float(), torch.tensor(d2_flow_ft).float())
+        new_d1_rgb_ft, new_d1_flow_ft, d1_output, d1_ss_output = model(torch.tensor(d1_rgb_ft).float(), torch.tensor(d1_flow_ft).float())
+        new_d2_rgb_ft, new_d2_flow_ft, d2_output, d2_ss_output = model(torch.tensor(d2_rgb_ft).float(), torch.tensor(d2_flow_ft).float())
         d1_class_loss = ce_loss(d1_output, d1_labels.long())
         if add_mmd_loss:
             rgb_mmd_loss = mix_rbf_mmd2(
@@ -74,8 +74,8 @@ sum_samples = 0
 sum_correct = 0
 d1_test_loader, d2_test_loader = load_test_datasets()
 for (d1_rgb_test_ft, d1_flow_test_ft, d1_test_labels), (d2_rgb_test_ft, d2_flow_test_ft, d2_test_labels) in zip(d1_test_loader, d2_test_loader):
-    new_d1_rgb_ft, new_d1_flow_ft, d1_output = model(torch.tensor(d1_rgb_test_ft).float(), torch.tensor(d1_flow_test_ft).float())
-    new_d2_rgb_ft, new_d2_flow_ft, d2_output = model(torch.tensor(d2_rgb_test_ft).float(), torch.tensor(d2_flow_test_ft).float())
+    new_d1_rgb_ft, new_d1_flow_ft, d1_output, d1_ss_output = model(torch.tensor(d1_rgb_test_ft).float(), torch.tensor(d1_flow_test_ft).float())
+    new_d2_rgb_ft, new_d2_flow_ft, d2_output, d2_ss_output = model(torch.tensor(d2_rgb_test_ft).float(), torch.tensor(d2_flow_test_ft).float())
 
     d1_rgb_domain_labels = np.full(new_d1_rgb_ft.size()[0], 1)
     d2_rgb_domain_labels = np.full(new_d2_rgb_ft.size()[0], 2)
