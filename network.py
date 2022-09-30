@@ -7,23 +7,25 @@ class Net(nn.Module):
     def __init__(self):
         super(Net, self).__init__()
         #Intermediate features
-        self.fc1_rgb = nn.Linear(1024, 1024)
-        self.fc1_flow = nn.Linear(1024, 1024)
+        self.fc1_rgb_1 = nn.Linear(1024, 1024)
+        self.fc1_rgb_2 = nn.Linear(1024, 512)
+        self.fc1_flow_1 = nn.Linear(1024, 1024)
+        self.fc1_flow_2 = nn.Linear(1024, 512)
 
         # Self-supervision
-        self.fc2_a_1 = nn.Linear(2048, 100)
+        self.fc2_a_1 = nn.Linear(1024, 100)
         self.fc2_a_2 = nn.Linear(100, 2)
 
         # Classification heads
-        self.fc2_b_rgb = nn.Linear(1024, 8)
-        self.fc2_b_flow = nn.Linear(1024, 8)
+        self.fc2_b_rgb = nn.Linear(512, 8)
+        self.fc2_b_flow = nn.Linear(512, 8)
 
     def forward(self, x_rgb, x_flow):
         # Extract intermediate features
-        x_rgb = self.fc1_rgb(x_rgb)
-        x_flow = self.fc1_flow(x_flow)
-        mid_rgb_features = F.relu(x_rgb)
-        mid_flow_features = F.relu(x_flow)
+        x_rgb = F.relu(self.fc1_rgb_1(x_rgb))
+        x_flow = F.relu(self.fc1_flow_1(x_flow))
+        mid_rgb_features = F.relu(self.fc1_rgb_2(x_rgb))
+        mid_flow_features = F.relu(self.fc1_flow_2(x_flow))
 
         # Send intermediate features to self-supervision
         concat_features = torch.cat((mid_rgb_features, mid_flow_features), -1)
