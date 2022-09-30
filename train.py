@@ -11,31 +11,32 @@ import matplotlib.pyplot as plt
 import wandb
 
 
-wandb.init(project="mmsada_mmd_baseline", name="run-5", config={"initial_lr": 0.0001, "secondary_lr": 0.00008, "tertiary_lr": 0.00005, "epochs": 100, "batch_size": 128})
+wandb.init(project="mmsada_mmd_baseline", name="run-6-ss", config={"initial_lr": 0.0001, "secondary_lr": 0.00008, "self_supervision": True, "lambda_c": 5, "epochs": 100, "batch_size": 128})
 
 epochs = 100
 
 d1_loader, d2_loader = load_training_datasets()
 model = Net()
 optim = torch.optim.Adam(model.parameters(), lr=0.0001)
+ce_loss = nn.CrossEntropyLoss()
 for epoch in range(epochs):
     print(f"Epoch: {epoch}")
     add_mmd_loss = False
     if epoch > 35:
         add_mmd_loss = True
         optim.param_groups[0]['lr'] = 0.00008
-    if epoch > 80:
-        optim.param_groups[0]['lr'] = 0.00005
     sum_loss = 0
     sum_mmd_loss = 0
+    sum_ss_loss = 0
     counter = 0
     for (d1_rgb_ft, d1_flow_ft, d1_labels), (d2_rgb_ft, d2_flow_ft, d2_labels) in zip(d1_loader, d2_loader):
         if d1_rgb_ft.shape != d2_rgb_ft.shape or d1_flow_ft.shape != d2_flow_ft.shape:
             continue
-        ce_loss = nn.CrossEntropyLoss()
         new_d1_rgb_ft, new_d1_flow_ft, d1_output, d1_ss_output = model(torch.tensor(d1_rgb_ft).float(), torch.tensor(d1_flow_ft).float())
         new_d2_rgb_ft, new_d2_flow_ft, d2_output, d2_ss_output = model(torch.tensor(d2_rgb_ft).float(), torch.tensor(d2_flow_ft).float())
         d1_class_loss = ce_loss(d1_output, d1_labels.long())
+        d1_ss_loss = ce_loss(d1_ss_output, torch.full((d1_ss_output.size()[0],), 1))
+        d2_ss_loss = ce_loss(d2_ss_output, torch.full((d2_ss_output.size()[0],), 1))
         if add_mmd_loss:
             rgb_mmd_loss = mix_rbf_mmd2(
                 new_d1_rgb_ft,
@@ -47,22 +48,26 @@ for epoch in range(epochs):
                 new_d2_flow_ft,
                 gammas=[(2.0 ** gamma) * 9.7 for gamma in np.arange(-8.0, 8.0, 2.0 ** 0.5)]
             )
-            loss = d1_class_loss + (1 * (rgb_mmd_loss + flow_mmd_loss))
+            loss = d1_class_loss + (5 * (d1_ss_loss + d2_ss_loss)) + (1 * (rgb_mmd_loss + flow_mmd_loss))
+            sum_ss_loss += (5*(d1_ss_loss + d2_ss_loss))
             sum_mmd_loss += (rgb_mmd_loss + flow_mmd_loss)
             sum_loss += loss
         else:
-            loss = d1_class_loss
+            loss = d1_class_loss + (5 * (d1_ss_loss + d2_ss_loss))
+            sum_ss_loss += (d1_ss_loss + d2_ss_loss)
             sum_loss += loss
         counter += 1
         optim.zero_grad()
         loss.backward()
         optim.step()
     if add_mmd_loss:
-        print(f"Loss = {sum_loss / counter}, MMD Loss = {sum_mmd_loss / counter}")
+        print(f"Loss = {sum_loss / counter}, SS Loss = {sum_ss_loss}, MMD Loss = {sum_mmd_loss / counter}")
         wandb.log({"Total Loss": (sum_loss / counter)})
+        wandb.log({"Self-Supervision Loss": (sum_ss_loss / counter)})
         wandb.log({"MMD Loss": (sum_mmd_loss / counter)})
     else:
-        print(f"Loss = {sum_loss / counter}")
+        print(f"Loss = {sum_loss / counter}, SS Loss = {sum_ss_loss / counter}")
+        wandb.log({"Self-Supervision Loss": (sum_ss_loss / counter)})
         wandb.log({"Total Loss": (sum_loss / counter)})
 
 
