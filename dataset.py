@@ -4,27 +4,6 @@ import numpy as np
 import pandas as pd
 
 
-class CustomDataset(Dataset):
-    def __init__(self, data_path, labels_path, modality):
-        data_info = load_data(data_path)
-        label_info = load_data(labels_path)
-        self.data = reshape_data(data_info, modality)
-        ids = np.array(data_info['narration_ids'])
-        ids_col = np.array([])
-        for single_id in ids:
-            id_num = int(single_id.split("_")[-1])
-            verb_class = label_info.set_index('uid').loc[id_num, 'verb_class']
-            ids = np.repeat(verb_class, 5)
-            ids_col = np.concatenate((ids_col, ids), axis=0)
-        self.labels = ids_col
-
-    def __len__(self):
-        return len(self.labels)
-
-    def __getitem__(self, index):
-        return self.data[index], self.labels[index]
-
-
 class RgbFlowDataset(Dataset):
     def __init__(self, rgb_data_path, flow_data_path, labels_path):
         rgb_data_info = load_data(rgb_data_path)
@@ -59,33 +38,33 @@ def reshape_data(data, modality):
     return data['features'][modality].reshape(shape[0]*shape[1], 1024)
 
 
-def load_training_datasets():
+def load_training_datasets(source_data_name, source_labels_name, target_data_name, target_labels_name, batch_size):
     d1_train = RgbFlowDataset(
-        rgb_data_path="./pre_extracted_features/RGB/RGB/ek_i3d/D1-D1_train.pkl",
-        flow_data_path="./pre_extracted_features/Flow/Flow/ek_i3d/D1-D1_train.pkl",
-        labels_path="./label_lookup/D1_train.pkl"
+        rgb_data_path=f"./pre_extracted_features/RGB/RGB/ek_i3d/{source_data_name}.pkl",
+        flow_data_path=f"./pre_extracted_features/Flow/Flow/ek_i3d/{source_data_name}.pkl",
+        labels_path=f"./label_lookup/{source_labels_name}.pkl"
     )
     d1_loader = DataLoader(d1_train, batch_size=64, shuffle=True)
     d2_train = RgbFlowDataset(
-        rgb_data_path="./pre_extracted_features/RGB/RGB/ek_i3d/D2-D2_train.pkl",
-        flow_data_path="./pre_extracted_features/Flow/Flow/ek_i3d/D2-D2_train.pkl",
-        labels_path="./label_lookup/D2_train.pkl"
+        rgb_data_path=f"./pre_extracted_features/RGB/RGB/ek_i3d/{target_data_name}.pkl",
+        flow_data_path=f"./pre_extracted_features/Flow/Flow/ek_i3d/{target_data_name}.pkl",
+        labels_path=f"./label_lookup/{target_labels_name}.pkl"
     )
     d2_loader = DataLoader(d2_train, batch_size=64, shuffle=True)
     return d1_loader, d2_loader
 
 
-def load_test_datasets():
+def load_test_datasets(source_data_name, source_labels_name, target_data_name, target_labels_name, batch_size):
     d1_train = RgbFlowDataset(
-        rgb_data_path="./pre_extracted_features/RGB/RGB/ek_i3d/D1-D1_test.pkl",
-        flow_data_path="./pre_extracted_features/Flow/Flow/ek_i3d/D1-D1_test.pkl",
-        labels_path="./label_lookup/D1_test.pkl"
+        rgb_data_path=f"./pre_extracted_features/RGB/RGB/ek_i3d/{source_data_name}.pkl",
+        flow_data_path=f"./pre_extracted_features/Flow/Flow/ek_i3d/{source_data_name}.pkl",
+        labels_path=f"./label_lookup/{source_labels_name}.pkl"
     )
-    d1_loader = DataLoader(d1_train, batch_size=64, shuffle=True)
+    d1_loader = DataLoader(d1_train, batch_size=batch_size, shuffle=True)
     d2_train = RgbFlowDataset(
-        rgb_data_path="./pre_extracted_features/RGB/RGB/ek_i3d/D2-D2_test.pkl",
-        flow_data_path="./pre_extracted_features/Flow/Flow/ek_i3d/D2-D2_test.pkl",
-        labels_path="./label_lookup/D2_test.pkl"
+        rgb_data_path=f"./pre_extracted_features/RGB/RGB/ek_i3d/{target_data_name}.pkl",
+        flow_data_path=f"./pre_extracted_features/Flow/Flow/ek_i3d/{target_data_name}.pkl",
+        labels_path=f"./label_lookup/{target_labels_name}.pkl"
     )
-    d2_loader = DataLoader(d2_train, batch_size=64, shuffle=True)
+    d2_loader = DataLoader(d2_train, batch_size=batch_size, shuffle=True)
     return d1_loader, d2_loader

@@ -20,7 +20,7 @@ class Net(nn.Module):
         self.fc2_b_rgb = nn.Linear(512, 8)
         self.fc2_b_flow = nn.Linear(512, 8)
 
-    def forward(self, x_rgb, x_flow):
+    def forward(self, x_rgb, x_flow, is_training):
         # Extract intermediate features
         x_rgb = F.relu(self.fc1_rgb_1(x_rgb))
         x_flow = F.relu(self.fc1_flow_1(x_flow))
@@ -36,4 +36,4 @@ class Net(nn.Module):
         rgb_class_logits = self.fc2_b_rgb(mid_rgb_features)
         flow_class_logits = self.fc2_b_flow(mid_flow_features)
         class_logits = (rgb_class_logits + flow_class_logits)
-        return mid_rgb_features, mid_flow_features, class_logits, ss_logits
+        return F.dropout(mid_rgb_features, p=0.5, training=is_training), F.dropout(mid_flow_features, p=0.5, training=is_training), class_logits, ss_logits
