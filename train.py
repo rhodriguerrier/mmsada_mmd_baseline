@@ -56,14 +56,37 @@ class Model:
 		self.ce_loss = nn.CrossEntropyLoss()
 
 	def train_model(self):
+		add_mmd_loss = False
 		for epoch in range(self.epochs):
 			print(f"Epoch: {epoch}")
-			add_mmd_loss = False
-			if epoch > 35:
+			if epoch == 36:
+				rgb_ft_after, rgb_domain_labels_after, flow_ft_after, flow_domain_labels_after, class_labels_after = self.test()
+				plot_data(
+					rgb_ft_after.detach().numpy(),
+					flow_ft_after.detach().numpy(),
+					rgb_domain_labels_after,
+					flow_domain_labels_after,
+					class_labels_after,
+					"after classification and SS",
+					"tsne_features_after_c_ss"
+				)
 				add_mmd_loss = True
 				self.optim.param_groups[0]['lr'] = self.secondary_lr
+			elif epoch == 65:
+				rgb_ft_after, rgb_domain_labels_after, flow_ft_after, flow_domain_labels_after, class_labels_after = self.test()
+				plot_data(
+					rgb_ft_after.detach().numpy(),
+					flow_ft_after.detach().numpy(),
+					rgb_domain_labels_after,
+					flow_domain_labels_after,
+					class_labels_after,
+					"half way through MMD",
+					"tsne_features_mid_MMD"
+				)
 			sum_loss = 0
 			sum_mmd_loss = 0
+			sum_rgb_mmd_loss = 0
+			sum_flow_mmd_loss = 0
 			sum_ss_loss = 0
 			counter = 0
 			for (d1_rgb_ft, d1_flow_ft, d1_labels), (d2_rgb_ft, d2_flow_ft, d2_labels) in zip(self.source_train_loader, self.target_train_loader):
@@ -72,6 +95,7 @@ class Model:
 				new_d1_rgb_ft, new_d1_flow_ft, d1_output, d1_ss_output = self.model(torch.tensor(d1_rgb_ft).float(), torch.tensor(d1_flow_ft).float(), True)
 				new_d2_rgb_ft, new_d2_flow_ft, d2_output, d2_ss_output = self.model(torch.tensor(d2_rgb_ft).float(), torch.tensor(d2_flow_ft).float(), True)
 				d1_class_loss = self.ce_loss(d1_output, d1_labels.long())
+				
 				d1_ss_loss = self.ce_loss(d1_ss_output, torch.full((d1_ss_output.size()[0],), 1))
 				d2_ss_loss = self.ce_loss(d2_ss_output, torch.full((d2_ss_output.size()[0],), 1))
 				if add_mmd_loss:
@@ -85,8 +109,12 @@ class Model:
 						new_d2_flow_ft,
 						gammas=[(2.0 ** gamma) * 9.7 for gamma in np.arange(-8.0, 8.0, 2.0 ** 0.5)]
 					)
-					loss = d1_class_loss + (5 * (d1_ss_loss + d2_ss_loss)) + (1 * (rgb_mmd_loss + flow_mmd_loss))
+					rgb_mmd_scaling_factor = rgb_mmd_loss / flow_mmd_loss
+					flow_mmd_scaling_factor = flow_mmd_loss / rgb_mmd_loss
+					loss = d1_class_loss + (5 * (d1_ss_loss + d2_ss_loss)) + (1 * ((rgb_mmd_scaling_factor*rgb_mmd_loss) + (flow_mmd_scaling_factor*flow_mmd_loss)))
 					sum_ss_loss += (5*(d1_ss_loss + d2_ss_loss))
+					sum_rgb_mmd_loss += rgb_mmd_loss
+					sum_flow_mmd_loss += flow_mmd_loss
 					sum_mmd_loss += (rgb_mmd_loss + flow_mmd_loss)
 					sum_loss += loss
 				else:
@@ -99,11 +127,16 @@ class Model:
 				self.optim.step()
 			if add_mmd_loss:
 				print(f"Loss = {sum_loss / counter}, SS Loss = {sum_ss_loss}, MMD Loss = {sum_mmd_loss / counter}")
+				print(f"RGB MMD Loss = {sum_rgb_mmd_loss / counter}, Flow MMD Loss = {sum_flow_mmd_loss / counter}")
+				print(new_d1_rgb_ft)
+				print(new_d1_flow_ft)
 				#wandb.log({"Total Loss": (sum_loss / counter)})
 				#wandb.log({"Self-Supervision Loss": (sum_ss_loss / counter)})
 				#wandb.log({"MMD Loss": (sum_mmd_loss / counter)})
 			else:
 				print(f"Loss = {sum_loss / counter}, SS Loss = {sum_ss_loss / counter}")
+				print(new_d1_rgb_ft)
+				print(new_d1_flow_ft)
 				#wandb.log({"Self-Supervision Loss": (sum_ss_loss / counter)})
 				#wandb.log({"Total Loss": (sum_loss / counter)})
 
@@ -145,7 +178,8 @@ def plot_data(
 		rgb_domain_labels,
 		flow_domain_labels,
 		class_labels,
-		test_run_stage
+		test_run_stage,
+		file_name
 ):
 	low_dim_rgb = TSNE(
 	n_components=2,
@@ -156,7 +190,7 @@ def plot_data(
 		init='random'
 	).fit_transform(flow_ft)
 	fig, axs = plt.subplots(2, 2)
-	fig.suptitle(f"tSNE plot of features {test_run_stage} model trained")
+	fig.suptitle(f"tSNE plot of features {test_run_stage}")
 	axs[0, 0].scatter(low_dim_rgb[:,0], low_dim_rgb[:,1], 1, c=rgb_domain_labels)
 	axs[0, 0].set_title("RGB by Domain")
 	axs[0, 1].scatter(low_dim_flow[:,0], low_dim_flow[:,1], 1, c=flow_domain_labels)
@@ -165,7 +199,7 @@ def plot_data(
 	axs[1, 0].set_title("RGB by Class")
 	axs[1, 1].scatter(low_dim_flow[:,0], low_dim_flow[:,1], 1, c=class_labels)
 	axs[1, 1].set_title("Flow by Class")
-	fig.savefig(f"tsne_features_{test_run_stage}.png")
+	fig.savefig(f"{file_name}.png")
 
 
 if __name__ == "__main__":
@@ -182,7 +216,8 @@ if __name__ == "__main__":
 		rgb_domain_labels_before,
 		flow_domain_labels_before,
 		class_labels_before, 
-		"before"
+		"before model trained",
+		"tsne_features_before"
 	)
 	model.train_model()
 	rgb_ft_after, rgb_domain_labels_after, flow_ft_after, flow_domain_labels_after, class_labels_after = model.test()
@@ -192,5 +227,6 @@ if __name__ == "__main__":
 		rgb_domain_labels_after,
 		flow_domain_labels_after,
 		class_labels_after,
-		"after"
+		"after model trained",
+		"tsne_features_after"
 	)	
