@@ -39,18 +39,22 @@ class Model:
 		self.secondary_lr = secondary_lr
 		self.model = Net()
 		self.source_train_loader, self.target_train_loader = load_training_datasets(
-			"D1-D1_train",
-			"D1_train",
-			"D2-D2_train",
-			"D2_train",
-			self.batch_size
+			"D1-D1_train.pkl",
+			"D1_train.pkl",
+			"D1-D2_train.hkl",
+			"D2_train.pkl",
+			self.batch_size,
+			source_hickle=False,
+			target_hickle=True
 		)
 		self.source_test_loader, self.target_test_loader = load_test_datasets(
-			"D1-D1_test",
-			"D1_test",
-			"D2-D2_test",
-			"D2_test",
-			self.batch_size
+			"D1-D1_test.pkl",
+			"D1_test.pkl",
+			"D1-D2_test.pkl",
+			"D2_test.pkl",
+			self.batch_size,
+			source_hickle=False,
+			target_hickle=False
 		)
 		self.optim = torch.optim.Adam(self.model.parameters(), lr=self.initial_lr)
 		self.ce_loss = nn.CrossEntropyLoss()

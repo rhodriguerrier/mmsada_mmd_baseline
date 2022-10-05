@@ -36,4 +36,4 @@ class Net(nn.Module):
         rgb_class_logits = self.fc2_b_rgb(mid_rgb_features)
         flow_class_logits = self.fc2_b_flow(mid_flow_features)
         class_logits = (rgb_class_logits + flow_class_logits)
-        return F.dropout(mid_rgb_features, p=0.5, training=is_training), F.dropout(mid_flow_features, p=0.5, training=is_training), class_logits, ss_logits
+        return mid_rgb_features, mid_flow_features, class_logits, ss_logits
