@@ -9,21 +9,32 @@ import numpy as np
 from sklearn.manifold import TSNE
 import matplotlib.pyplot as plt
 import wandb
+import argparse
 
 
-#wandb.init(
-#    project="mmsada_mmd_baseline",
-#    name="run-7-ss",
-#    config={
-#        "initial_lr": 0.0001,
-#        "secondary_lr": 0.00008,
-#        "self_supervision": True,
-#        "lambda_c": 5,
-#        "epochs": 100,
-#        "batch_size": 128,
-#        "feature_dims": "1024 -> 1024 -> 512"
-#    }
-#)
+wandb.init(
+    project="mmsada_mmd_baseline",
+    name="run-5-d1-d2",
+    config={
+        "initial_lr": 0.0001,
+        "secondary_lr": 0.00008,
+        "self_supervision": True,
+        "lambda_c": 5,
+        "epochs": 100,
+        "batch_size": 128,
+        "batch_norm": True,
+        "dropout": 0.5,
+        "weight_decay": 0.0000001,
+        "feature_in_format": "concatenate",
+        "feature_dims": "5120 -> 1024 -> 512"
+    }
+)
+
+net_selector = {
+    "separate": Net,
+    "concatenate": ConcatFeaturesNet,
+    "average": Net
+}
 
 class Model:
     def __init__(
@@ -31,33 +42,35 @@ class Model:
             epochs,
             batch_size,
             initial_lr,
-            secondary_lr
+            secondary_lr,
+            src_dom_name,
+            trg_dom_name,
+            action_seg_format
     ):
         self.epochs = epochs
         self.batch_size = batch_size
         self.initial_lr = initial_lr
         self.secondary_lr = secondary_lr
-        #self.model = Net()
-        self.model = ConcatFeaturesNet()
+        self.model = net_selector[action_seg_format]()
         self.source_train_loader, self.target_train_loader = load_datasets(
-            "D1-D1_train.pkl",
-            "D1_train.pkl",
-            "D1-D2_train.hkl",
-            "D2_train.pkl",
+            f"{src_dom_name}-{src_dom_name}_train.pkl",
+            f"{src_dom_name}_train.pkl",
+            f"{src_dom_name}-{trg_dom_name}_train.hkl",
+            f"{trg_dom_name}_train.pkl",
             self.batch_size,
             source_hickle=False,
             target_hickle=True,
-            action_seg_format="concat"
+            action_seg_format=action_seg_format
         )
         self.source_test_loader, self.target_test_loader = load_datasets(
-            "D1-D1_test.pkl",
-            "D1_test.pkl",
-            "D1-D2_test.pkl",
-            "D2_test.pkl",
+            f"{src_dom_name}-{src_dom_name}_test.pkl",
+            f"{src_dom_name}_test.pkl",
+            f"{src_dom_name}-{trg_dom_name}_test.pkl",
+            f"{trg_dom_name}_test.pkl",
             self.batch_size,
             source_hickle=False,
             target_hickle=False,
-            action_seg_format="concat"
+            action_seg_format=action_seg_format
         )
         self.optim = torch.optim.Adam(self.model.parameters(), lr=self.initial_lr, weight_decay=0.0000001)
         self.ce_loss = nn.CrossEntropyLoss()
@@ -95,6 +108,7 @@ class Model:
             sum_rgb_mmd_loss = 0
             sum_flow_mmd_loss = 0
             sum_ss_loss = 0
+            sum_src_cls_loss = 0
             counter = 0
             for (d1_rgb_ft, d1_flow_ft, d1_labels), (d2_rgb_ft, d2_flow_ft, d2_labels) in zip(self.source_train_loader, self.target_train_loader):
                 if d1_rgb_ft.shape != d2_rgb_ft.shape or d1_flow_ft.shape != d2_flow_ft.shape:
@@ -102,7 +116,6 @@ class Model:
                 new_d1_rgb_ft, new_d1_flow_ft, d1_output, d1_ss_output = self.model(torch.tensor(d1_rgb_ft).float(), torch.tensor(d1_flow_ft).float(), True)
                 new_d2_rgb_ft, new_d2_flow_ft, d2_output, d2_ss_output = self.model(torch.tensor(d2_rgb_ft).float(), torch.tensor(d2_flow_ft).float(), True)
                 d1_class_loss = self.ce_loss(d1_output, d1_labels.long())
-
                 d1_ss_loss = self.ce_loss(d1_ss_output, torch.full((d1_ss_output.size()[0],), 1))
                 d2_ss_loss = self.ce_loss(d2_ss_output, torch.full((d2_ss_output.size()[0],), 1))
                 if add_mmd_loss:
@@ -124,10 +137,12 @@ class Model:
                     sum_flow_mmd_loss += flow_mmd_loss
                     sum_mmd_loss += (rgb_mmd_loss + flow_mmd_loss)
                     sum_loss += loss
+                    sum_src_cls_loss += d1_class_loss
                 else:
                     loss = d1_class_loss + (5 * (d1_ss_loss + d2_ss_loss))
                     sum_ss_loss += (d1_ss_loss + d2_ss_loss)
                     sum_loss += loss
+                    sum_src_cls_loss += d1_class_loss
                 counter += 1
                 self.optim.zero_grad()
                 loss.backward()
@@ -135,13 +150,17 @@ class Model:
             if add_mmd_loss:
                 print(f"Loss = {sum_loss / counter}, SS Loss = {sum_ss_loss}, MMD Loss = {sum_mmd_loss / counter}")
                 print(f"RGB MMD Loss = {sum_rgb_mmd_loss / counter}, Flow MMD Loss = {sum_flow_mmd_loss / counter}")
-                #wandb.log({"Total Loss": (sum_loss / counter)})
-                #wandb.log({"Self-Supervision Loss": (sum_ss_loss / counter)})
-                #wandb.log({"MMD Loss": (sum_mmd_loss / counter)})
+                wandb.log({"Total Loss": (sum_loss / counter)})
+                wandb.log({"Source Classification Loss": (sum_src_cls_loss / counter)})
+                wandb.log({"Self-Supervision Loss": (sum_ss_loss / counter)})
+                wandb.log({"MMD Loss": (sum_mmd_loss / counter)})
+                wandb.log({"RGB MMD Loss": (sum_rgb_mmd_loss / counter)})
+                wandb.log({"Flow MMD Loss": (sum_flow_mmd_loss / counter)})
             else:
                 print(f"Loss = {sum_loss / counter}, SS Loss = {sum_ss_loss / counter}")
-                #wandb.log({"Self-Supervision Loss": (sum_ss_loss / counter)})
-                #wandb.log({"Total Loss": (sum_loss / counter)})
+                wandb.log({"Self-Supervision Loss": (sum_ss_loss / counter)})
+                wandb.log({"Source Classification Loss": (sum_src_cls_loss / counter)})
+                wandb.log({"Total Loss": (sum_loss / counter)})
 
     def test(self):
         rgb_features = torch.tensor([])
@@ -151,27 +170,37 @@ class Model:
         class_labels = np.array([])
         sum_samples = 0
         sum_correct = 0
-        for (d1_rgb_test_ft, d1_flow_test_ft, d1_test_labels), (d2_rgb_test_ft, d2_flow_test_ft, d2_test_labels) in zip(self.source_test_loader, self.target_test_loader):
+        for (d1_rgb_test_ft, d1_flow_test_ft, d1_test_labels) in self.source_test_loader:
             new_d1_rgb_ft, new_d1_flow_ft, d1_output, d1_ss_output = self.model(torch.tensor(d1_rgb_test_ft).float(), torch.tensor(d1_flow_test_ft).float(), False)
-            new_d2_rgb_ft, new_d2_flow_ft, d2_output, d2_ss_output = self.model(torch.tensor(d2_rgb_test_ft).float(), torch.tensor(d2_flow_test_ft).float(), False)
 
             d1_rgb_domain_labels = np.full(new_d1_rgb_ft.size()[0], 1)
-            d2_rgb_domain_labels = np.full(new_d2_rgb_ft.size()[0], 2)
             d1_flow_domain_labels = np.full(new_d1_flow_ft.size()[0], 1)
+
+            rgb_features = torch.cat((rgb_features, new_d1_rgb_ft), 0)
+            rgb_domain_labels = np.concatenate((rgb_domain_labels, d1_rgb_domain_labels))
+            class_labels = np.concatenate((class_labels, d1_test_labels))
+            flow_features = torch.cat((flow_features, new_d1_flow_ft), 0)
+            flow_domain_labels = np.concatenate((flow_domain_labels, d1_flow_domain_labels))
+        for (d2_rgb_test_ft, d2_flow_test_ft, d2_test_labels) in self.target_test_loader:
+            new_d2_rgb_ft, new_d2_flow_ft, d2_output, d2_ss_output = self.model(torch.tensor(d2_rgb_test_ft).float(), torch.tensor(d2_flow_test_ft).float(), False)
+
+            d2_rgb_domain_labels = np.full(new_d2_rgb_ft.size()[0], 2)
             d2_flow_domain_labels = np.full(new_d2_flow_ft.size()[0], 2)
 
-            rgb_features = torch.cat((rgb_features, new_d1_rgb_ft, new_d2_rgb_ft), 0)
-            rgb_domain_labels = np.concatenate((rgb_domain_labels, d1_rgb_domain_labels, d2_rgb_domain_labels))
-            class_labels = np.concatenate((class_labels, d1_test_labels, d2_test_labels))
-            flow_features = torch.cat((flow_features, new_d1_flow_ft, new_d2_flow_ft), 0)
-            flow_domain_labels = np.concatenate((flow_domain_labels, d1_flow_domain_labels, d2_flow_domain_labels))
+            rgb_features = torch.cat((rgb_features, new_d2_rgb_ft), 0)
+            rgb_domain_labels = np.concatenate((rgb_domain_labels, d2_rgb_domain_labels))
+            class_labels = np.concatenate((class_labels, d2_test_labels))
+            flow_features = torch.cat((flow_features, new_d2_flow_ft), 0)
+            flow_domain_labels = np.concatenate((flow_domain_labels, d2_flow_domain_labels))
 
             d2_batch_results = torch.eq(torch.argmax(d2_output, dim=1), d2_test_labels.long()).long()
+            print(d2_batch_results.size())
             num_correct = torch.sum(d2_batch_results)
             sum_samples += d2_batch_results.size(dim=0)
             sum_correct += num_correct.item()
         print(sum_correct, sum_samples)
-        print(f"D2 Percentage correct = {(sum_correct / sum_samples) * 100}%")
+        print(f"Target Percentage correct = {(sum_correct / sum_samples) * 100}%")
+        wandb.log({"Target Test Accuracy": ((sum_correct / sum_samples) * 100)})
         return rgb_features, rgb_domain_labels, flow_features, flow_domain_labels, class_labels
 
 
@@ -206,11 +235,24 @@ def plot_data(
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="MMD Baseline App")
+    parser.add_argument("--src_dom_name", action="store", dest="src_dom_name", default="D1")
+    parser.add_argument("--trg_dom_name", action="store", dest="trg_dom_name", default="D2")
+    parser.add_argument("--batch_size", action="store", dest="batch_size", default="128")
+    parser.add_argument("--epochs", action="store", dest="epochs", default="100")
+    parser.add_argument("--initial_lr", action="store", dest="initial_lr", default="0.0001")
+    parser.add_argument("--secondary_lr", action="store", dest="secondary_lr", default="0.00008")
+    parser.add_argument("--action_seg_format", action="store", dest="action_seg_format", default="concatenate")
+    args = parser.parse_args()
+ 
     model = Model(
-        epochs=100,
-        batch_size=128,
-        initial_lr=0.0001,
-        secondary_lr=0.00008
+        epochs=int(args.epochs),
+        batch_size=int(args.batch_size),
+        initial_lr=float(args.initial_lr),
+        secondary_lr=float(args.secondary_lr),
+        src_dom_name=args.src_dom_name,
+        trg_dom_name=args.trg_dom_name,
+        action_seg_format=args.action_seg_format
     )
     rgb_ft_before, rgb_domain_labels_before, flow_ft_before, flow_domain_labels_before, class_labels_before = model.test()
     plot_data(

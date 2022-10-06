@@ -97,8 +97,8 @@ class RgbFlowAvgDataset(Dataset):
 
 ft_format_class = {
     "separate": RgbFlowDataset,
-    "concat": RgbFlowConcatDataset,
-    "avg": RgbFlowAvgDataset
+    "concatenate": RgbFlowConcatDataset,
+    "average": RgbFlowAvgDataset
 }
 
 
@@ -135,12 +135,12 @@ def load_datasets(source_data_path, source_labels_path, target_data_path, target
         labels_path=f"./label_lookup/{source_labels_path}",
         is_hickle=source_hickle
     )
-    source_loader = DataLoader(source_dataset, batch_size=batch_size, shuffle=True)
+    source_loader = DataLoader(source_dataset, batch_size=batch_size//2, shuffle=True)
     target_dataset = ft_format_class[action_seg_format](
         rgb_data_path=f"./pre_extracted_features/RGB/RGB/ek_i3d/{target_data_path}",
         flow_data_path=f"./pre_extracted_features/Flow/Flow/ek_i3d/{target_data_path}",
         labels_path=f"./label_lookup/{target_labels_path}",
         is_hickle=target_hickle
     )
-    target_loader = DataLoader(target_dataset, batch_size=batch_size, shuffle=True)
+    target_loader = DataLoader(target_dataset, batch_size=batch_size//2, shuffle=True)
     return source_loader, target_loader
