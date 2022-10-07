@@ -12,23 +12,23 @@ import wandb
 import argparse
 
 
-wandb.init(
-    project="mmsada_mmd_baseline",
-    name="run-5-d1-d2",
-    config={
-        "initial_lr": 0.0001,
-        "secondary_lr": 0.00008,
-        "self_supervision": True,
-        "lambda_c": 5,
-        "epochs": 100,
-        "batch_size": 128,
-        "batch_norm": True,
-        "dropout": 0.5,
-        "weight_decay": 0.0000001,
-        "feature_in_format": "concatenate",
-        "feature_dims": "5120 -> 1024 -> 512"
-    }
-)
+#wandb.init(
+#    project="mmsada_mmd_baseline",
+#    name="run-5-d1-d2",
+#    config={
+#        "initial_lr": 0.0001,
+#        "secondary_lr": 0.00008,
+#        "self_supervision": True,
+#        "lambda_c": 5,
+#        "epochs": 100,
+#        "batch_size": 128,
+#        "batch_norm": True,
+#        "dropout": 0.5,
+#        "weight_decay": 0.0000001,
+#        "feature_in_format": "concatenate",
+#        "feature_dims": "5120 -> 1024 -> 512"
+#    }
+#)
 
 net_selector = {
     "separate": Net,
@@ -76,6 +76,7 @@ class Model:
         self.ce_loss = nn.CrossEntropyLoss()
 
     def train_model(self):
+        self.model.train()
         add_mmd_loss = False
         for epoch in range(self.epochs):
             print(f"Epoch: {epoch}")
@@ -90,6 +91,7 @@ class Model:
                     "after classification and SS",
                     "tsne_features_after_c_ss"
                 )
+                self.model.train()
                 add_mmd_loss = True
                 self.optim.param_groups[0]['lr'] = self.secondary_lr
             elif epoch == 65:
@@ -103,6 +105,7 @@ class Model:
                     "half way through MMD",
                     "tsne_features_mid_MMD"
                 )
+                self.model.train()
             sum_loss = 0
             sum_mmd_loss = 0
             sum_rgb_mmd_loss = 0
@@ -113,8 +116,8 @@ class Model:
             for (d1_rgb_ft, d1_flow_ft, d1_labels), (d2_rgb_ft, d2_flow_ft, d2_labels) in zip(self.source_train_loader, self.target_train_loader):
                 if d1_rgb_ft.shape != d2_rgb_ft.shape or d1_flow_ft.shape != d2_flow_ft.shape:
                     continue
-                new_d1_rgb_ft, new_d1_flow_ft, d1_output, d1_ss_output = self.model(torch.tensor(d1_rgb_ft).float(), torch.tensor(d1_flow_ft).float(), True)
-                new_d2_rgb_ft, new_d2_flow_ft, d2_output, d2_ss_output = self.model(torch.tensor(d2_rgb_ft).float(), torch.tensor(d2_flow_ft).float(), True)
+                new_d1_rgb_ft, new_d1_flow_ft, d1_output, d1_ss_output = self.model(torch.tensor(d1_rgb_ft).float(), torch.tensor(d1_flow_ft).float(), False, True)
+                new_d2_rgb_ft, new_d2_flow_ft, d2_output, d2_ss_output = self.model(torch.tensor(d2_rgb_ft).float(), torch.tensor(d2_flow_ft).float(), True, True)
                 d1_class_loss = self.ce_loss(d1_output, d1_labels.long())
                 d1_ss_loss = self.ce_loss(d1_ss_output, torch.full((d1_ss_output.size()[0],), 1))
                 d2_ss_loss = self.ce_loss(d2_ss_output, torch.full((d2_ss_output.size()[0],), 1))
@@ -150,19 +153,20 @@ class Model:
             if add_mmd_loss:
                 print(f"Loss = {sum_loss / counter}, SS Loss = {sum_ss_loss}, MMD Loss = {sum_mmd_loss / counter}")
                 print(f"RGB MMD Loss = {sum_rgb_mmd_loss / counter}, Flow MMD Loss = {sum_flow_mmd_loss / counter}")
-                wandb.log({"Total Loss": (sum_loss / counter)})
-                wandb.log({"Source Classification Loss": (sum_src_cls_loss / counter)})
-                wandb.log({"Self-Supervision Loss": (sum_ss_loss / counter)})
-                wandb.log({"MMD Loss": (sum_mmd_loss / counter)})
-                wandb.log({"RGB MMD Loss": (sum_rgb_mmd_loss / counter)})
-                wandb.log({"Flow MMD Loss": (sum_flow_mmd_loss / counter)})
+                #wandb.log({"Total Loss": (sum_loss / counter)})
+                #wandb.log({"Source Classification Loss": (sum_src_cls_loss / counter)})
+                #wandb.log({"Self-Supervision Loss": (sum_ss_loss / counter)})
+                #wandb.log({"MMD Loss": (sum_mmd_loss / counter)})
+                #wandb.log({"RGB MMD Loss": (sum_rgb_mmd_loss / counter)})
+                #wandb.log({"Flow MMD Loss": (sum_flow_mmd_loss / counter)})
             else:
                 print(f"Loss = {sum_loss / counter}, SS Loss = {sum_ss_loss / counter}")
-                wandb.log({"Self-Supervision Loss": (sum_ss_loss / counter)})
-                wandb.log({"Source Classification Loss": (sum_src_cls_loss / counter)})
-                wandb.log({"Total Loss": (sum_loss / counter)})
+                #wandb.log({"Self-Supervision Loss": (sum_ss_loss / counter)})
+                #wandb.log({"Source Classification Loss": (sum_src_cls_loss / counter)})
+                #wandb.log({"Total Loss": (sum_loss / counter)})
 
     def test(self):
+        self.model.eval()
         rgb_features = torch.tensor([])
         flow_features = torch.tensor([])
         rgb_domain_labels = np.array([])
@@ -171,7 +175,7 @@ class Model:
         sum_samples = 0
         sum_correct = 0
         for (d1_rgb_test_ft, d1_flow_test_ft, d1_test_labels) in self.source_test_loader:
-            new_d1_rgb_ft, new_d1_flow_ft, d1_output, d1_ss_output = self.model(torch.tensor(d1_rgb_test_ft).float(), torch.tensor(d1_flow_test_ft).float(), False)
+            new_d1_rgb_ft, new_d1_flow_ft, d1_output, d1_ss_output = self.model(torch.tensor(d1_rgb_test_ft).float(), torch.tensor(d1_flow_test_ft).float(), False, False)
 
             d1_rgb_domain_labels = np.full(new_d1_rgb_ft.size()[0], 1)
             d1_flow_domain_labels = np.full(new_d1_flow_ft.size()[0], 1)
@@ -182,7 +186,7 @@ class Model:
             flow_features = torch.cat((flow_features, new_d1_flow_ft), 0)
             flow_domain_labels = np.concatenate((flow_domain_labels, d1_flow_domain_labels))
         for (d2_rgb_test_ft, d2_flow_test_ft, d2_test_labels) in self.target_test_loader:
-            new_d2_rgb_ft, new_d2_flow_ft, d2_output, d2_ss_output = self.model(torch.tensor(d2_rgb_test_ft).float(), torch.tensor(d2_flow_test_ft).float(), False)
+            new_d2_rgb_ft, new_d2_flow_ft, d2_output, d2_ss_output = self.model(torch.tensor(d2_rgb_test_ft).float(), torch.tensor(d2_flow_test_ft).float(), True, False)
 
             d2_rgb_domain_labels = np.full(new_d2_rgb_ft.size()[0], 2)
             d2_flow_domain_labels = np.full(new_d2_flow_ft.size()[0], 2)
@@ -200,7 +204,7 @@ class Model:
             sum_correct += num_correct.item()
         print(sum_correct, sum_samples)
         print(f"Target Percentage correct = {(sum_correct / sum_samples) * 100}%")
-        wandb.log({"Target Test Accuracy": ((sum_correct / sum_samples) * 100)})
+        #wandb.log({"Target Test Accuracy": ((sum_correct / sum_samples) * 100)})
         return rgb_features, rgb_domain_labels, flow_features, flow_domain_labels, class_labels
 
 
