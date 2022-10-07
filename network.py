@@ -20,12 +20,29 @@ class Net(nn.Module):
         self.fc2_b_rgb = nn.Linear(512, 8)
         self.fc2_b_flow = nn.Linear(512, 8)
 
-    def forward(self, x_rgb, x_flow, is_training):
+        # Extras
+        self.bn1_src_rgb = nn.BatchNorm1d(1024)
+        self.bn1_src_flow = nn.BatchNorm1d(1024)
+        self.bn1_trg_rgb = nn.BatchNorm1d(1024)
+        self.bn1_trg_flow = nn.BatchNorm1d(1024)
+        self.bn2_src_rgb = nn.BatchNorm1d(512)
+        self.bn2_src_flow = nn.BatchNorm1d(512)
+        self.bn2_trg_rgb = nn.BatchNorm1d(512)
+        self.bn2_trg_flow = nn.BatchNorm1d(512)
+        self.dropout = nn.Dropout(p=0.5)
+
+    def forward(self, x_rgb, x_flow, is_target):
         # Extract intermediate features
-        x_rgb = F.relu(self.fc1_rgb_1(x_rgb))
-        x_flow = F.relu(self.fc1_flow_1(x_flow))
-        mid_rgb_features = F.relu(self.fc1_rgb_2(x_rgb))
-        mid_flow_features = F.relu(self.fc1_flow_2(x_flow))
+        if is_target:
+            x_rgb = self.bn1_trg_rgb(F.relu(self.fc1_rgb_1(x_rgb)))
+            x_flow = self.bn1_trg_flow(F.relu(self.fc1_flow_1(x_flow)))
+            mid_rgb_features = self.bn2_trg_rgb(F.relu(self.fc1_rgb_2(x_rgb)))
+            mid_flow_features = self.bn2_trg_flow(F.relu(self.fc1_flow_2(x_flow)))
+        else:
+            x_rgb = self.bn1_src_rgb(F.relu(self.fc1_rgb_1(x_rgb)))
+            x_flow = self.bn1_src_flow(F.relu(self.fc1_flow_1(x_flow)))
+            mid_rgb_features = self.bn2_src_rgb(F.relu(self.fc1_rgb_2(x_rgb)))
+            mid_flow_features = self.bn2_src_flow(F.relu(self.fc1_flow_2(x_flow)))
 
         # Send intermediate features to self-supervision
         concat_features = torch.cat((mid_rgb_features, mid_flow_features), -1)
@@ -36,7 +53,7 @@ class Net(nn.Module):
         rgb_class_logits = self.fc2_b_rgb(mid_rgb_features)
         flow_class_logits = self.fc2_b_flow(mid_flow_features)
         class_logits = (rgb_class_logits + flow_class_logits)
-        return F.dropout(mid_rgb_features, p=0.5, training=is_training), F.dropout(mid_flow_features, p=0.5, training=is_training), class_logits, ss_logits
+        return self.dropout(mid_rgb_features), self.dropout(mid_flow_features), class_logits, ss_logits
 
 
 class ConcatFeaturesNet(nn.Module):
@@ -56,7 +73,7 @@ class ConcatFeaturesNet(nn.Module):
         self.fc2_b_rgb = nn.Linear(512, 8)
         self.fc2_b_flow = nn.Linear(512, 8)
 
-		# Extras
+        # Extras
         self.bn1_src_rgb = nn.BatchNorm1d(1024)
         self.bn1_src_flow = nn.BatchNorm1d(1024)
         self.bn1_trg_rgb = nn.BatchNorm1d(1024)
@@ -67,7 +84,7 @@ class ConcatFeaturesNet(nn.Module):
         self.bn2_trg_flow = nn.BatchNorm1d(512)
         self.dropout = nn.Dropout(p=0.5)
 
-    def forward(self, x_rgb, x_flow, is_target, is_training):
+    def forward(self, x_rgb, x_flow, is_target):
         # Extract intermediate features
         if is_target:
             x_rgb = self.bn1_trg_rgb(F.relu(self.fc1_rgb_1(x_rgb)))
