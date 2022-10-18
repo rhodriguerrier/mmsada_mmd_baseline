@@ -12,23 +12,23 @@ import wandb
 import argparse
 
 
-wandb.init(
-    project="mmsada_mmd_baseline",
-    name="concat-3-d3-d1-fine",
-    config={
-        "initial_lr": 0.0001,
-        "secondary_lr": 0.00008,
-        "self_supervision": True,
-        "lambda_c": 5,
-        "epochs": 50,
-        "batch_size": 128,
-        "batch_norm": True,
-        "dropout": 0.5,
-        "weight_decay": 0.0000001,
-        "feature_in_format": "concatenate",
-        "feature_dims": "5120 -> 1024 -> 512"
-    }
-)
+#wandb.init(
+#    project="mmsada_mmd_baseline",
+#    name="concat-3-d3-d1-fine",
+#    config={
+#        "initial_lr": 0.0001,
+#        "secondary_lr": 0.00008,
+#        "self_supervision": True,
+#        "lambda_c": 5,
+#        "epochs": 50,
+#        "batch_size": 128,
+#        "batch_norm": True,
+#        "dropout": 0.5,
+#        "weight_decay": 0.0000001,
+#        "feature_in_format": "concatenate",
+#        "feature_dims": "5120 -> 1024 -> 512"
+#    }
+#)
 
 net_selector = {
     "separate": Net,
@@ -53,8 +53,8 @@ class Model:
         self.initial_lr = initial_lr
         self.secondary_lr = secondary_lr
         self.model = net_selector[action_seg_format]()
-		self.feature_loss_method = feature_loss_method
-		if self.feature_loss_method == "Adversarial":
+        self.feature_loss_method = feature_loss_method
+        if self.feature_loss_method == "Adversarial":
             self.rgb_discrim_model = DomainDiscriminator()
             self.rgb_discrim_optim = torch.optim.Adam(
                 self.rgb_discrim_model.parameters(),
@@ -148,22 +148,20 @@ class Model:
                 flow_ft_loss = 0
                 if add_feature_loss:
                     # discriminator loss here
-                    rgb_concat_labels = torch.cat((rgb_src_domain_labels, rgb_tgt_domain_labels))
                     rgb_concat_ft = torch.cat((new_src_rgb_ft, new_tgt_rgb_ft), dim=0)
                     rgb_domain_predictions = self.rgb_discrim_model(rgb_concat_ft)
                     rgb_src_domain_labels = torch.ones(new_src_rgb_ft.size(0)).long()
                     rgb_tgt_domain_labels = torch.zeros(new_tgt_rgb_ft.size(0)).long()
-                    rgb_discrim_loss = self.ce_loss(rgb_domain_predicitions, torch.cat((rgb_src_domain_labels, rgb_tgt_domain_labels)))
+                    rgb_discrim_loss = self.ce_loss(rgb_domain_predictions, torch.cat((rgb_src_domain_labels, rgb_tgt_domain_labels)))
                     sum_rgb_discrim_loss += rgb_discrim_loss
                     rgb_discrim_loss.backward()
                     self.rgb_discrim_optim.step()
 
-                    flow_concat_labels = torch.cat((flow_src_domain_labels, flow_tgt_domain_labels))
                     flow_concat_ft = torch.cat((new_src_flow_ft, new_tgt_flow_ft), dim=0)
                     flow_domain_predictions = self.flow_discrim_model(flow_concat_ft)
                     flow_src_domain_labels = torch.ones(new_src_flow_ft.size(0)).long()
                     flow_tgt_domain_labels = torch.zeros(new_tgt_flow_ft.size(0)).long()
-                    flow_discrim_loss = self.ce_loss(flow_domain_predicitions, torch.cat((flow_src_domain_labels, flow_tgt_domain_labels)))
+                    flow_discrim_loss = self.ce_loss(flow_domain_predictions, torch.cat((flow_src_domain_labels, flow_tgt_domain_labels)))
                     sum_flow_discrim_loss += flow_discrim_loss
                     flow_discrim_loss.backward()
                     self.flow_discrim_optim.step()
@@ -174,20 +172,18 @@ class Model:
                     new_src_rgb_ft, new_src_flow_ft, src_output, src_ss_output = self.model(torch.tensor(src_rgb_ft).float(), torch.tensor(src_flow_ft).float(), False)
                     new_tgt_rgb_ft, new_tgt_flow_ft, tgt_output, tgt_ss_output = self.model(torch.tensor(tgt_rgb_ft).float(), torch.tensor(tgt_flow_ft).float(), True)
 
-                    rgb_concat_labels = torch.cat((rgb_src_domain_labels, rgb_tgt_domain_labels))
                     rgb_concat_ft = torch.cat((new_src_rgb_ft, new_tgt_rgb_ft), dim=0)
                     rgb_domain_predictions = self.rgb_discrim_model(rgb_concat_ft)
                     rgb_src_domain_labels = torch.zeros(new_src_rgb_ft.size(0)).long()
                     rgb_tgt_domain_labels = torch.ones(new_tgt_rgb_ft.size(0)).long()
-                    rgb_ft_loss = self.ce_loss(rgb_domain_predicitions, torch.cat((rgb_src_domain_labels, rgb_tgt_domain_labels)))
+                    rgb_ft_loss = self.ce_loss(rgb_domain_predictions, torch.cat((rgb_src_domain_labels, rgb_tgt_domain_labels)))
                     sum_rgb_ft_loss += rgb_ft_loss
 
-                    flow_concat_labels = torch.cat((flow_src_domain_labels, flow_tgt_domain_labels))
                     flow_concat_ft = torch.cat((new_src_flow_ft, new_tgt_flow_ft), dim=0)
                     flow_domain_predictions = self.flow_discrim_model(flow_concat_ft)
                     flow_src_domain_labels = torch.zeros(new_src_flow_ft.size(0)).long()
                     flow_tgt_domain_labels = torch.ones(new_tgt_flow_ft.size(0)).long()
-                    flow_ft_loss = self.ce_loss(flow_domain_predicitions, torch.cat((flow_src_domain_labels, flow_tgt_domain_labels)))
+                    flow_ft_loss = self.ce_loss(flow_domain_predictions, torch.cat((flow_src_domain_labels, flow_tgt_domain_labels)))
                     sum_flow_ft_loss += flow_ft_loss
 
                 src_class_loss = self.ce_loss(src_output, src_labels.long())
@@ -205,18 +201,18 @@ class Model:
                 print(f"Loss = {sum_loss / counter}, SS Loss = {sum_ss_loss}")
                 print(f"RGB Discriminator Loss = {sum_rgb_discrim_loss / counter}, RGB Feature Loss = {sum_rgb_ft_loss / counter}")
                 print(f"Flow Discriminator Loss = {sum_flow_discrim_loss / counter}, Flow Feature Loss = {sum_flow_ft_loss / counter}")
-                wandb.log({"Total Loss": (sum_loss / counter)})
-                wandb.log({"Source Classification Loss": (sum_src_cls_loss / counter)})
-                wandb.log({"Self-Supervision Loss": (sum_ss_loss / counter)})
-                wandb.log({"RGB Discriminator Loss": (sum_rgb_discrim_loss / counter)})
-                wandb.log({"RGB Feature Loss": (sum_rgb_ft_loss / counter)})
-                wandb.log({"Flow Discriminator Loss": (sum_flow_discrim_loss / counter)})
-                wandb.log({"Flow Feature Loss": (sum_flow_ft_loss / counter)})
+                #wandb.log({"Total Loss": (sum_loss / counter)})
+                #wandb.log({"Source Classification Loss": (sum_src_cls_loss / counter)})
+                #wandb.log({"Self-Supervision Loss": (sum_ss_loss / counter)})
+                #wandb.log({"RGB Discriminator Loss": (sum_rgb_discrim_loss / counter)})
+                #wandb.log({"RGB Feature Loss": (sum_rgb_ft_loss / counter)})
+                #wandb.log({"Flow Discriminator Loss": (sum_flow_discrim_loss / counter)})
+                #wandb.log({"Flow Feature Loss": (sum_flow_ft_loss / counter)})
             else:
                 print(f"Loss = {sum_loss / counter}, SS Loss = {sum_ss_loss / counter}")
-                wandb.log({"Self-Supervision Loss": (sum_ss_loss / counter)})
-                wandb.log({"Source Classification Loss": (sum_src_cls_loss / counter)})
-                wandb.log({"Total Loss": (sum_loss / counter)})
+                #wandb.log({"Self-Supervision Loss": (sum_ss_loss / counter)})
+                #wandb.log({"Source Classification Loss": (sum_src_cls_loss / counter)})
+                #wandb.log({"Total Loss": (sum_loss / counter)})
             
 
     def train_mmd_baseline(self):
@@ -305,17 +301,17 @@ class Model:
             if add_mmd_loss:
                 print(f"Loss = {sum_loss / counter}, SS Loss = {sum_ss_loss}, MMD Loss = {sum_mmd_loss / counter}")
                 print(f"RGB MMD Loss = {sum_rgb_mmd_loss / counter}, Flow MMD Loss = {sum_flow_mmd_loss / counter}")
-                wandb.log({"Total Loss": (sum_loss / counter)})
-                wandb.log({"Source Classification Loss": (sum_src_cls_loss / counter)})
-                wandb.log({"Self-Supervision Loss": (sum_ss_loss / counter)})
-                wandb.log({"MMD Loss": (sum_mmd_loss / counter)})
-                wandb.log({"RGB MMD Loss": (sum_rgb_mmd_loss / counter)})
-                wandb.log({"Flow MMD Loss": (sum_flow_mmd_loss / counter)})
+                #wandb.log({"Total Loss": (sum_loss / counter)})
+                #wandb.log({"Source Classification Loss": (sum_src_cls_loss / counter)})
+                #wandb.log({"Self-Supervision Loss": (sum_ss_loss / counter)})
+                #wandb.log({"MMD Loss": (sum_mmd_loss / counter)})
+                #wandb.log({"RGB MMD Loss": (sum_rgb_mmd_loss / counter)})
+                #wandb.log({"Flow MMD Loss": (sum_flow_mmd_loss / counter)})
             else:
                 print(f"Loss = {sum_loss / counter}, SS Loss = {sum_ss_loss / counter}")
-                wandb.log({"Self-Supervision Loss": (sum_ss_loss / counter)})
-                wandb.log({"Source Classification Loss": (sum_src_cls_loss / counter)})
-                wandb.log({"Total Loss": (sum_loss / counter)})
+                #wandb.log({"Self-Supervision Loss": (sum_ss_loss / counter)})
+                #wandb.log({"Source Classification Loss": (sum_src_cls_loss / counter)})
+                #wandb.log({"Total Loss": (sum_loss / counter)})
 
     def test(self):
         self.model.eval()
@@ -355,7 +351,7 @@ class Model:
             sum_correct += num_correct.item()
         print(sum_correct, sum_samples)
         print(f"Target Percentage correct = {(sum_correct / sum_samples) * 100}%")
-        wandb.log({"Target Test Accuracy": ((sum_correct / sum_samples) * 100)})
+        #wandb.log({"Target Test Accuracy": ((sum_correct / sum_samples) * 100)})
         return rgb_features, rgb_domain_labels, flow_features, flow_domain_labels, class_labels
 
 
@@ -398,7 +394,7 @@ if __name__ == "__main__":
     parser.add_argument("--initial_lr", action="store", dest="initial_lr", default="0.0001")
     parser.add_argument("--secondary_lr", action="store", dest="secondary_lr", default="0.00008")
     parser.add_argument("--action_seg_format", action="store", dest="action_seg_format", default="concatenate")
-	parser.add_argument("--feature_loss_method", actions="store", dest="feature_loss_method", default="Adversarial")
+    parser.add_argument("--feature_loss_method", action="store", dest="feature_loss_method", default="Adversarial")
     args = parser.parse_args()
  
     model = Model(
@@ -409,7 +405,7 @@ if __name__ == "__main__":
         src_dom_name=args.src_dom_name,
         trg_dom_name=args.trg_dom_name,
         action_seg_format=args.action_seg_format,
-		feature_loss_method=args.feature_loss_method
+        feature_loss_method=args.feature_loss_method
     )
     if args.feature_loss_method == "Adversarial":
         model.train_mmsada()
@@ -422,6 +418,6 @@ if __name__ == "__main__":
         rgb_domain_labels_after,
         flow_domain_labels_after,
         class_labels_after,
-        "after model trained",
-        "tsne_features_after"
+        "after model trained with adversarial",
+        "tsne_features_after_adversarial"
     )
