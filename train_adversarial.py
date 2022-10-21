@@ -12,24 +12,23 @@ import wandb
 import argparse
 
 
-wandb.init(
-    project="mmsada_mmd_baseline",
-    name="d1-to-d2-adversarial-10",
-    config={
-        "initial_lr": 0.001,
-        "secondary_lr": 0.0002,
-        "self_supervision": True,
-        "lambda_c": 5,
-        "epochs": 150,
-        "batch_size": 128,
-        "batch_norm": True,
-        "dropout": 0.5,
-        "weight_decay": 0.0000001,
-        "feature_in_format": "concatenate",
-        "feature_dims": "5120 -> 1024 -> 512",
-        "adversarial": True
-    }
-)
+#wandb.init(
+#    project="mmsada_mmd_baseline",
+#    name="d1-to-d2-adversarial-17",
+#    config={
+#        "initial_lr": 0.0001,
+#        "self_supervision": True,
+#        "lambda_c": 5,
+#        "epochs": 150,
+#        "batch_size": 128,
+#        "batch_norm": True,
+#        "dropout": 0.5,
+#        "weight_decay": 0.0000001,
+#        "feature_in_format": "concatenate",
+#        "feature_dims": "5120 -> 1024 -> 512",
+#        "adversarial": True
+#    }
+#)
 
 net_selector = {
     "separate": Net,
@@ -43,7 +42,6 @@ class Model:
             epochs,
             batch_size,
             initial_lr,
-            secondary_lr,
             src_dom_name,
             trg_dom_name,
             action_seg_format
@@ -51,7 +49,6 @@ class Model:
         self.epochs = epochs
         self.batch_size = batch_size
         self.initial_lr = initial_lr
-        self.secondary_lr = secondary_lr
         self.model = net_selector[action_seg_format]()
         self.rgb_discrim_model = DomainDiscriminator()
         self.rgb_discrim_optim = torch.optim.SGD(
@@ -95,7 +92,6 @@ class Model:
         self.model.train()
         self.rgb_discrim_model.train()
         self.flow_discrim_model.train()
-        add_feature_loss = False
         for epoch in range(self.epochs):
             print(f"Epoch: {epoch}")
             rgb_ft_after, rgb_domain_labels_after, flow_ft_after, flow_domain_labels_after, class_labels_after = self.test()
@@ -109,20 +105,7 @@ class Model:
                     "before model trained",
                     "tsne_features_before"
                 )
-            elif epoch == 35:
-                plot_data(
-                    rgb_ft_after.detach().numpy(),
-                    flow_ft_after.detach().numpy(),
-                    rgb_domain_labels_after,
-                    flow_domain_labels_after,
-                    class_labels_after,
-                    "after classification and SS",
-                    "tsne_features_after_c_ss"
-                )
-                add_feature_loss = True
-                self.rgb_discrim_optim.param_groups[0]['lr'] = self.secondary_lr
-                self.flow_discrim_optim.param_groups[0]['lr'] = self.secondary_lr
-            elif epoch == 65:
+            elif epoch == 50:
                 plot_data(
                     rgb_ft_after.detach().numpy(),
                     flow_ft_after.detach().numpy(),
@@ -146,48 +129,47 @@ class Model:
                 new_tgt_rgb_ft, new_tgt_flow_ft, tgt_output, tgt_ss_output = self.model(torch.tensor(tgt_rgb_ft).float(), torch.tensor(tgt_flow_ft).float(), True)
                 rgb_ft_loss = 0
                 flow_ft_loss = 0
-                if add_feature_loss:
-                    # discriminator loss here
-                    self.rgb_discrim_optim.zero_grad()
-                    self.flow_discrim_optim.zero_grad()
+                # discriminator loss here
+                self.rgb_discrim_optim.zero_grad()
+                self.flow_discrim_optim.zero_grad()
 
-                    rgb_concat_ft = torch.cat((new_src_rgb_ft, new_tgt_rgb_ft), dim=0)
-                    rgb_domain_predictions = self.rgb_discrim_model(rgb_concat_ft)
-                    rgb_src_domain_labels = torch.ones(new_src_rgb_ft.size(0)).long()
-                    rgb_tgt_domain_labels = torch.zeros(new_tgt_rgb_ft.size(0)).long()
-                    rgb_discrim_loss = self.ce_loss(rgb_domain_predictions, torch.cat((rgb_src_domain_labels, rgb_tgt_domain_labels)))
-                    sum_rgb_discrim_loss += rgb_discrim_loss
-                    rgb_discrim_loss.backward()
-                    self.rgb_discrim_optim.step()
+                rgb_concat_ft = torch.cat((new_src_rgb_ft, new_tgt_rgb_ft), dim=0)
+                rgb_domain_predictions = self.rgb_discrim_model(rgb_concat_ft)
+                rgb_src_domain_labels = torch.ones(new_src_rgb_ft.size(0)).long()
+                rgb_tgt_domain_labels = torch.zeros(new_tgt_rgb_ft.size(0)).long()
+                rgb_discrim_loss = self.ce_loss(rgb_domain_predictions, torch.cat((rgb_src_domain_labels, rgb_tgt_domain_labels)))
+                sum_rgb_discrim_loss += rgb_discrim_loss
+                rgb_discrim_loss.backward()
+                self.rgb_discrim_optim.step()
 
-                    flow_concat_ft = torch.cat((new_src_flow_ft, new_tgt_flow_ft), dim=0)
-                    flow_domain_predictions = self.flow_discrim_model(flow_concat_ft)
-                    flow_src_domain_labels = torch.ones(new_src_flow_ft.size(0)).long()
-                    flow_tgt_domain_labels = torch.zeros(new_tgt_flow_ft.size(0)).long()
-                    flow_discrim_loss = self.ce_loss(flow_domain_predictions, torch.cat((flow_src_domain_labels, flow_tgt_domain_labels)))
-                    sum_flow_discrim_loss += flow_discrim_loss
-                    flow_discrim_loss.backward()
-                    self.flow_discrim_optim.step()
+                flow_concat_ft = torch.cat((new_src_flow_ft, new_tgt_flow_ft), dim=0)
+                flow_domain_predictions = self.flow_discrim_model(flow_concat_ft)
+                flow_src_domain_labels = torch.ones(new_src_flow_ft.size(0)).long()
+                flow_tgt_domain_labels = torch.zeros(new_tgt_flow_ft.size(0)).long()
+                flow_discrim_loss = self.ce_loss(flow_domain_predictions, torch.cat((flow_src_domain_labels, flow_tgt_domain_labels)))
+                sum_flow_discrim_loss += flow_discrim_loss
+                flow_discrim_loss.backward()
+                self.flow_discrim_optim.step()
 
-                    # feature loss here
-                    self.rgb_discrim_optim.zero_grad()
-                    self.flow_discrim_optim.zero_grad()
-                    new_src_rgb_ft, new_src_flow_ft, src_output, src_ss_output = self.model(torch.tensor(src_rgb_ft).float(), torch.tensor(src_flow_ft).float(), False)
-                    new_tgt_rgb_ft, new_tgt_flow_ft, tgt_output, tgt_ss_output = self.model(torch.tensor(tgt_rgb_ft).float(), torch.tensor(tgt_flow_ft).float(), True)
+                # feature loss here
+                self.rgb_discrim_optim.zero_grad()
+                self.flow_discrim_optim.zero_grad()
+                new_src_rgb_ft, new_src_flow_ft, src_output, src_ss_output = self.model(torch.tensor(src_rgb_ft).float(), torch.tensor(src_flow_ft).float(), False)
+                new_tgt_rgb_ft, new_tgt_flow_ft, tgt_output, tgt_ss_output = self.model(torch.tensor(tgt_rgb_ft).float(), torch.tensor(tgt_flow_ft).float(), True)
 
-                    rgb_concat_ft = torch.cat((new_src_rgb_ft, new_tgt_rgb_ft), dim=0)
-                    rgb_domain_predictions = self.rgb_discrim_model(rgb_concat_ft)
-                    rgb_src_domain_labels = torch.zeros(new_src_rgb_ft.size(0)).long()
-                    rgb_tgt_domain_labels = torch.ones(new_tgt_rgb_ft.size(0)).long()
-                    rgb_ft_loss = self.ce_loss(rgb_domain_predictions, torch.cat((rgb_src_domain_labels, rgb_tgt_domain_labels)))
-                    sum_rgb_ft_loss += rgb_ft_loss
+                rgb_concat_ft = torch.cat((new_src_rgb_ft, new_tgt_rgb_ft), dim=0)
+                rgb_domain_predictions = self.rgb_discrim_model(rgb_concat_ft)
+                rgb_src_domain_labels = torch.zeros(new_src_rgb_ft.size(0)).long()
+                rgb_tgt_domain_labels = torch.ones(new_tgt_rgb_ft.size(0)).long()
+                rgb_ft_loss = self.ce_loss(rgb_domain_predictions, torch.cat((rgb_src_domain_labels, rgb_tgt_domain_labels)))
+                sum_rgb_ft_loss += rgb_ft_loss
 
-                    flow_concat_ft = torch.cat((new_src_flow_ft, new_tgt_flow_ft), dim=0)
-                    flow_domain_predictions = self.flow_discrim_model(flow_concat_ft)
-                    flow_src_domain_labels = torch.zeros(new_src_flow_ft.size(0)).long()
-                    flow_tgt_domain_labels = torch.ones(new_tgt_flow_ft.size(0)).long()
-                    flow_ft_loss = self.ce_loss(flow_domain_predictions, torch.cat((flow_src_domain_labels, flow_tgt_domain_labels)))
-                    sum_flow_ft_loss += flow_ft_loss
+                flow_concat_ft = torch.cat((new_src_flow_ft, new_tgt_flow_ft), dim=0)
+                flow_domain_predictions = self.flow_discrim_model(flow_concat_ft)
+                flow_src_domain_labels = torch.zeros(new_src_flow_ft.size(0)).long()
+                flow_tgt_domain_labels = torch.ones(new_tgt_flow_ft.size(0)).long()
+                flow_ft_loss = self.ce_loss(flow_domain_predictions, torch.cat((flow_src_domain_labels, flow_tgt_domain_labels)))
+                sum_flow_ft_loss += flow_ft_loss
 
                 src_class_loss = self.ce_loss(src_output, src_labels.long())
                 src_ss_loss = self.ce_loss(src_ss_output, torch.full((src_ss_output.size()[0],), 1))
@@ -200,22 +182,16 @@ class Model:
                 self.optim.zero_grad()
                 loss.backward()
                 self.optim.step()
-            if add_feature_loss:
-                print(f"Loss = {sum_loss / counter}, SS Loss = {sum_ss_loss}")
-                print(f"RGB Discriminator Loss = {sum_rgb_discrim_loss / counter}, RGB Feature Loss = {sum_rgb_ft_loss / counter}")
-                print(f"Flow Discriminator Loss = {sum_flow_discrim_loss / counter}, Flow Feature Loss = {sum_flow_ft_loss / counter}")
-                wandb.log({"Total Loss": (sum_loss / counter)})
-                wandb.log({"Source Classification Loss": (sum_src_cls_loss / counter)})
-                wandb.log({"Self-Supervision Loss": (sum_ss_loss / counter)})
-                wandb.log({"RGB Discriminator Loss": (sum_rgb_discrim_loss / counter)})
-                wandb.log({"RGB Feature Loss": (sum_rgb_ft_loss / counter)})
-                wandb.log({"Flow Discriminator Loss": (sum_flow_discrim_loss / counter)})
-                wandb.log({"Flow Feature Loss": (sum_flow_ft_loss / counter)})
-            else:
-                print(f"Loss = {sum_loss / counter}, SS Loss = {sum_ss_loss / counter}")
-                wandb.log({"Self-Supervision Loss": (sum_ss_loss / counter)})
-                wandb.log({"Source Classification Loss": (sum_src_cls_loss / counter)})
-                wandb.log({"Total Loss": (sum_loss / counter)})
+            print(f"Loss = {sum_loss / counter}, SS Loss = {sum_ss_loss}")
+            print(f"RGB Discriminator Loss = {sum_rgb_discrim_loss / counter}, RGB Feature Loss = {sum_rgb_ft_loss / counter}")
+            print(f"Flow Discriminator Loss = {sum_flow_discrim_loss / counter}, Flow Feature Loss = {sum_flow_ft_loss / counter}")
+            #wandb.log({"Total Loss": (sum_loss / counter)})
+            #wandb.log({"Source Classification Loss": (sum_src_cls_loss / counter)})
+            #wandb.log({"Self-Supervision Loss": (sum_ss_loss / counter)})
+            #wandb.log({"RGB Discriminator Loss": (sum_rgb_discrim_loss / counter)})
+            #wandb.log({"RGB Feature Loss": (sum_rgb_ft_loss / counter)})
+            #wandb.log({"Flow Discriminator Loss": (sum_flow_discrim_loss / counter)})
+            #wandb.log({"Flow Feature Loss": (sum_flow_ft_loss / counter)})
             
  
     def test(self):
@@ -256,7 +232,7 @@ class Model:
             sum_correct += num_correct.item()
         print(sum_correct, sum_samples)
         print(f"Target Percentage correct = {(sum_correct / sum_samples) * 100}%")
-        wandb.log({"Target Test Accuracy": ((sum_correct / sum_samples) * 100)})
+        #wandb.log({"Target Test Accuracy": ((sum_correct / sum_samples) * 100)})
         return rgb_features, rgb_domain_labels, flow_features, flow_domain_labels, class_labels
 
 
@@ -296,8 +272,7 @@ if __name__ == "__main__":
     parser.add_argument("--trg_dom_name", action="store", dest="trg_dom_name", default="D2")
     parser.add_argument("--batch_size", action="store", dest="batch_size", default="128")
     parser.add_argument("--epochs", action="store", dest="epochs", default="150")
-    parser.add_argument("--initial_lr", action="store", dest="initial_lr", default="0.001")
-    parser.add_argument("--secondary_lr", action="store", dest="secondary_lr", default="0.0002")
+    parser.add_argument("--initial_lr", action="store", dest="initial_lr", default="0.0001")
     parser.add_argument("--action_seg_format", action="store", dest="action_seg_format", default="concatenate")
     args = parser.parse_args()
  
@@ -305,7 +280,6 @@ if __name__ == "__main__":
         epochs=int(args.epochs),
         batch_size=int(args.batch_size),
         initial_lr=float(args.initial_lr),
-        secondary_lr=float(args.secondary_lr),
         src_dom_name=args.src_dom_name,
         trg_dom_name=args.trg_dom_name,
         action_seg_format=args.action_seg_format

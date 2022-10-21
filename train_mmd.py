@@ -14,11 +14,11 @@ import argparse
 
 wandb.init(
     project="mmsada_mmd_baseline",
-    name="d1-to-d2-MMD-1",
+    name="d1-to-d2-MMD-no-ss-4",
     config={
         "initial_lr": 0.001,
-        "secondary_lr": 0.0002,
-        "self_supervision": True,
+        "secondary_lr": 0.001,
+        "self_supervision": False,
         "lambda_c": 5,
         "epochs": 150,
         "batch_size": 128,
@@ -144,6 +144,7 @@ class Model:
                     rgb_mmd_scaling_factor = rgb_mmd_loss / flow_mmd_loss
                     flow_mmd_scaling_factor = flow_mmd_loss / rgb_mmd_loss
                     loss = d1_class_loss + (5 * (d1_ss_loss + d2_ss_loss)) + (1 * ((rgb_mmd_scaling_factor*rgb_mmd_loss) + (flow_mmd_scaling_factor*flow_mmd_loss)))
+                    loss = d1_class_loss + (1 * ((rgb_mmd_scaling_factor*rgb_mmd_loss) + (flow_mmd_scaling_factor*flow_mmd_loss)))
                     sum_ss_loss += (5*(d1_ss_loss + d2_ss_loss))
                     sum_rgb_mmd_loss += rgb_mmd_loss
                     sum_flow_mmd_loss += flow_mmd_loss
@@ -151,6 +152,7 @@ class Model:
                     sum_loss += loss
                     sum_src_cls_loss += d1_class_loss
                 else:
+                    loss = d1_class_loss + (5 * (d1_ss_loss + d2_ss_loss))
                     loss = d1_class_loss + (5 * (d1_ss_loss + d2_ss_loss))
                     sum_ss_loss += (d1_ss_loss + d2_ss_loss)
                     sum_loss += loss
@@ -161,6 +163,7 @@ class Model:
                 self.optim.step()
             if add_mmd_loss:
                 print(f"Loss = {sum_loss / counter}, SS Loss = {sum_ss_loss}, MMD Loss = {sum_mmd_loss / counter}")
+                print(f"Loss = {sum_loss / counter}, MMD Loss = {sum_mmd_loss / counter}")
                 print(f"RGB MMD Loss = {sum_rgb_mmd_loss / counter}, Flow MMD Loss = {sum_flow_mmd_loss / counter}")
                 wandb.log({"Total Loss": (sum_loss / counter)})
                 wandb.log({"Source Classification Loss": (sum_src_cls_loss / counter)})
@@ -170,6 +173,7 @@ class Model:
                 wandb.log({"Flow MMD Loss": (sum_flow_mmd_loss / counter)})
             else:
                 print(f"Loss = {sum_loss / counter}, SS Loss = {sum_ss_loss / counter}")
+                print(f"Loss = {sum_loss / counter}")
                 wandb.log({"Self-Supervision Loss": (sum_ss_loss / counter)})
                 wandb.log({"Source Classification Loss": (sum_src_cls_loss / counter)})
                 wandb.log({"Total Loss": (sum_loss / counter)})
@@ -253,7 +257,7 @@ if __name__ == "__main__":
     parser.add_argument("--batch_size", action="store", dest="batch_size", default="128")
     parser.add_argument("--epochs", action="store", dest="epochs", default="150")
     parser.add_argument("--initial_lr", action="store", dest="initial_lr", default="0.001")
-    parser.add_argument("--secondary_lr", action="store", dest="secondary_lr", default="0.0002")
+    parser.add_argument("--secondary_lr", action="store", dest="secondary_lr", default="0.001")
     parser.add_argument("--action_seg_format", action="store", dest="action_seg_format", default="concatenate")
     args = parser.parse_args()
  
