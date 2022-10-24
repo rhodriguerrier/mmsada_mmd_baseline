@@ -214,6 +214,7 @@ class Model:
             class_labels = np.concatenate((class_labels, d1_test_labels))
             flow_features = torch.cat((flow_features, new_d1_flow_ft), 0)
             flow_domain_labels = np.concatenate((flow_domain_labels, d1_flow_domain_labels))
+        per_class_correct = {str(i): 0 for i in range(8)}
         for (d2_rgb_test_ft, d2_flow_test_ft, d2_test_labels) in self.target_test_loader:
             new_d2_rgb_ft, new_d2_flow_ft, d2_output, d2_ss_output = self.model(torch.tensor(d2_rgb_test_ft).float(), torch.tensor(d2_flow_test_ft).float(), True)
 
@@ -226,12 +227,18 @@ class Model:
             flow_features = torch.cat((flow_features, new_d2_flow_ft), 0)
             flow_domain_labels = np.concatenate((flow_domain_labels, d2_flow_domain_labels))
 
-            d2_batch_results = torch.eq(torch.argmax(d2_output, dim=1), d2_test_labels.long()).long()
+            output_labels = torch.argmax(d2_output, dim=1)
+            expected_labels = d2_test_labels.long()
+            d2_batch_results = torch.eq(output_labels, expected_labels).long()
+            for i, val in enumerate(output_labels):
+                if d2_batch_results[i].item() == 1:
+                    per_class_correct[str(val.item())] += 1
             num_correct = torch.sum(d2_batch_results)
             sum_samples += d2_batch_results.size(dim=0)
             sum_correct += num_correct.item()
         print(sum_correct, sum_samples)
         print(f"Target Percentage correct = {(sum_correct / sum_samples) * 100}%")
+        print(per_class_correct)
         #wandb.log({"Target Test Accuracy": ((sum_correct / sum_samples) * 100)})
         return rgb_features, rgb_domain_labels, flow_features, flow_domain_labels, class_labels
 
