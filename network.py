@@ -56,6 +56,18 @@ class Net(nn.Module):
         return self.dropout(mid_rgb_features), self.dropout(mid_flow_features), class_logits, ss_logits
 
 
+class DomainDiscriminator(nn.Module):
+    def __init__(self):
+        super(DomainDiscriminator, self).__init__()
+        self.fc1 = nn.Linear(512, 100)
+        self.fc2 = nn.Linear(100, 2)
+
+    def forward(self, x):
+        x = F.relu(self.fc1(x))
+        output_logits = self.fc2(x)
+        return output_logits
+
+
 class ConcatFeaturesNet(nn.Module):
     def __init__(self):
         super(ConcatFeaturesNet, self).__init__()
